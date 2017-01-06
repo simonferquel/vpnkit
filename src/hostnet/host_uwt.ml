@@ -386,7 +386,34 @@ module Sockets = struct
              let _ = Uwt.Tcp.close fd in
              errorf "Socket.%s.connect %s: caught %s" label description (Printexc.to_string e)
           )
-
+            
+      let connect_to ?(read_buffer_size = default_read_buffer_size) (ip, port) timeout_s =
+        let description = "tcp:" ^ (Ipaddr.to_string ip) ^ ":" ^ (string_of_int port) in
+        register_connection description
+        >>= fun idx ->
+        let label, fd =
+          try match ip with
+            | Ipaddr.V4 _ -> "TCPv4", Uwt.Tcp.init_ipv4_exn ()
+            | Ipaddr.V6 _ -> "TCPv6", Uwt.Tcp.init_ipv6_exn ()
+          with e -> deregister_connection idx; raise e in
+        Lwt.catch
+          (fun () ->
+             let sockaddr = make_sockaddr (ip, port) in
+             let c = Uwt.Tcp.connect fd ~addr:sockaddr in
+             let tmout = Uwt.Timer.sleep (int_of_float (timeout_s *. 1000.)) in
+             ignore(Lwt.pick [
+                (tmout >|= fun () -> ignore(Uwt.Tcp.close fd));
+                (c >|= fun () -> ());
+             ]);
+             c >>= fun () ->
+             Lwt_result.return (of_fd ~idx ~label ~read_buffer_size ~description fd)
+          )
+          (fun e ->
+             (* FIXME(djs55): error handling *)
+             deregister_connection idx;
+             let _ = Uwt.Tcp.close fd in
+             errorf "Socket.%s.connect %s: caught %s" label description (Printexc.to_string e)
+          )
       let shutdown_read _ =
         Lwt.return ()
 

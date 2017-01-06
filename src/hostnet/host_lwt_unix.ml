@@ -574,6 +574,10 @@ module Stream = struct
         | Ipaddr.V4 _ -> Lwt_unix.PF_INET
         | Ipaddr.V6 _ -> Lwt_unix.PF_INET6 in
       connect description ?read_buffer_size pf Lwt_unix.SOCK_STREAM sockaddr
+    
+    let connect_to ?read_buffer_size (ip, port) timeout_s =
+      ignore(read_buffer_size); ignore(ip); ignore(port); ignore(timeout_s);
+      failwith "not implemented"
 
     let bind (ip, port) =
       unix_bind Lwt_unix.SOCK_STREAM (ip, port)

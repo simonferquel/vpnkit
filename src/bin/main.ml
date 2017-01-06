@@ -48,6 +48,8 @@ let hvsock_addr_of_uri ~default_serviceid uri =
     else if String.length p > 0 then String.sub p 1 (String.length p - 1) else p in
     { Hvsock.vmid; serviceid }
 
+
+
 module Main(Host: Sig.HOST) = struct
 
 module Connect_unix = Connect.Make_unix(Host)
@@ -65,6 +67,14 @@ let file_descr_of_int (x: int) : Unix.file_descr =
   then failwith "Cannot convert from an int to Unix.file_descr on platforms other than Unix";
   Obj.magic x
 
+let tcp_addr_of_uri ~default_port uri =
+  (* tcp://{ip}:{port} *)
+  let host = match Uri.host uri with None -> "127.0.0.1" | Some x -> x in
+  let port = match Uri.port uri with None -> default_port | Some p -> p in 
+  let address = Ipaddr.of_string_exn host in
+  (address, port)
+
+
 let unix_listen path =
   let startswith prefix x =
     let prefix' = String.length prefix in
@@ -78,6 +88,30 @@ let unix_listen path =
     let fd = file_descr_of_int x in
     Lwt.return (Host.Sockets.Stream.Unix.of_bound_fd fd)
   end else Host.Sockets.Stream.Unix.bind path
+
+let tcp_connect_forever url sockaddr callback = 
+  Log.info (fun f -> f "connecting to %s" url);
+  let rec aux () = 
+    Lwt.catch
+      (fun() ->
+        Host.Sockets.Stream.Tcp.connect_to sockaddr 1.0
+        >>= function
+        | Result.Error (`Msg x) -> failwith x
+        | Result.Ok flow ->
+        Log.info (fun f -> f "tcp connected successfully");
+        callback flow
+      ) (function
+        | Unix.Unix_error(_, _, _) ->
+          Log.info (fun f -> f "tcp connected failed");
+          Lwt.return_unit
+        | _ ->
+          Log.info (fun f -> f "tcp connected failed"); 
+          Lwt.return_unit
+      )
+    >>= fun() ->
+    aux () in
+  Log.debug (fun f -> f "Waiting for connections on socket %s" url);
+  aux ()  
 
 let hvsock_connect_forever url sockaddr callback =
   Log.info (fun f -> f "connecting to %s:%s" (Hvsock.string_of_vmid sockaddr.Hvsock.vmid) sockaddr.Hvsock.serviceid);
@@ -284,6 +318,25 @@ let main_t socket_url port_control_url introspection_url diagnostics_url max_con
     hvsock_connect_forever socket_url sockaddr
       (fun fd ->
         let conn = HV.connect fd in
+        ( match config with
+          | Some config -> Slirp_stack.create config
+          | None -> Lwt.return hardcoded_configuration )
+        >>= fun stack ->
+        Slirp_stack.connect stack conn
+        >>= fun stack ->
+        Log.info (fun f -> f "stack connected");
+        start_introspection introspection_url (Slirp_stack.filesystem stack);
+        start_diagnostics diagnostics_url @@ Slirp_stack.diagnostics stack;
+        Slirp_stack.after_disconnect stack
+        >>= fun () ->
+        Log.info (fun f -> f "stack disconnected");
+        Lwt.return ()
+      )
+  | Some "tcp" ->
+    let module Slirp_stack = Slirp.Make(Config)(Vmnet.Make(Host.Sockets.Stream.Tcp))(Dns_policy)(Host) in
+    let sockaddr = tcp_addr_of_uri 6752 (Uri.of_string socket_url) in
+    tcp_connect_forever socket_url sockaddr
+      (fun conn ->
         ( match config with
           | Some config -> Slirp_stack.create config
           | None -> Lwt.return hardcoded_configuration )

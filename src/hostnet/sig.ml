@@ -98,6 +98,12 @@ module type SOCKETS = sig
       include FLOW_SERVER
         with type address := address
          and type flow := flow
+      
+      
+      val connect_to: ?read_buffer_size:int -> address -> float
+        -> flow Error.t
+      (** [connect_to address timout_s] creates a connection to [address] and returns
+          he connected flow. *)
     end
 
     module Unix: sig

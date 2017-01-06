@@ -377,20 +377,7 @@ module Make(Config: Active_config.S)(Vmnet: Sig.VMNET)(Dns_policy: Sig.DNS_POLIC
           | _ ->
             Lwt.return_unit in
         Stack_ipv4.input t.endpoint.Endpoint.ipv4 ~tcp:none ~udp:none ~default raw
-      (* UDP on port 53 -> DNS forwarder *)
-      | Ipv4 { src; dst; payload = Udp { src = src_port; dst = 53; payload = Payload payload; _ }; _ } ->
-        let udp = t.endpoint.Endpoint.udp4 in
-        !dns >>= fun t ->
-        Dns_forwarder.handle_udp ~t ~udp ~src ~dst ~src_port payload
-      (* TCP to port 53 -> DNS forwarder *)
-      | Ipv4 { src; dst; payload = Tcp { src = src_port; dst = 53; syn; raw; payload = Payload _; _ }; _ } ->
-        let id = { Stack_tcp_wire.local_port = 53; dest_ip = src; local_ip = dst; dest_port = src_port } in
-        Endpoint.intercept_tcp_syn t.endpoint ~id ~syn
-          (fun () ->
-            !dns >>= fun t ->
-            Dns_forwarder.handle_tcp ~t
-          ) raw
-      (* UDP to port 123: localhost NTP *)
+     (* UDP to port 123: localhost NTP *)
       | Ipv4 { src; payload = Udp { src = src_port; dst = 123; payload = Payload payload; _ }; _ } ->
         let localhost = Ipaddr.V4.localhost in
         Log.debug (fun f -> f "UDP/123 request from port %d -- sending it to %a:%d" src_port Ipaddr.V4.pp_hum localhost 123);

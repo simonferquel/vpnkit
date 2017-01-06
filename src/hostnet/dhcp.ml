@@ -45,22 +45,12 @@ module Make(Netif: V1_LWT.NETWORK) = struct
       of_int32 @@ Int32.succ i32, of_int32 @@ Int32.succ @@ Int32.succ i32 in
     let prefix = smallest_prefix peer_ip [ local_ip; low_ip; high_ip ] 32 in
     let get_dhcp_configuration () : Dhcp_server.Config.t =
-      (* The domain search is encoded using the scheme used for DNS names *)
-      let domain_search =
-        let open Dns in
-        let buffer = Cstruct.create 1024 in
-        let _, n, _ = List.fold_left (fun (map, n, buffer) name ->
-          Name.marshal map n buffer (Name.of_string name)
-        ) (Name.Map.empty, 0, buffer) (get_domain_search ()) in
-        Cstruct.(to_string (sub buffer 0 n)) in
       let options = [
         Dhcp_wire.Domain_name (get_domain_name ());
         Dhcp_wire.Routers [ local_ip ];
-        Dhcp_wire.Dns_servers (local_ip :: extra_dns_ip);
         Dhcp_wire.Ntp_servers [ local_ip ];
         Dhcp_wire.Broadcast_addr (Ipaddr.V4.Prefix.broadcast prefix);
         Dhcp_wire.Subnet_mask (Ipaddr.V4.Prefix.netmask prefix);
-        Dhcp_wire.Domain_search domain_search;
       ] in {
         options = options;
         hostname = "vpnkit"; (* it's us! *)
@@ -111,17 +101,14 @@ module Make(Netif: V1_LWT.NETWORK) = struct
         let domain = List.fold_left (fun acc x -> match x with
           | Domain_name y -> y
           | _ -> acc) "unknown" reply.options in
-        let dns = List.fold_left (fun acc x -> match x with
-          | Dns_servers ys -> String.concat ", " (List.map Ipaddr.V4.to_string ys)
-          | _ -> acc) "none" reply.options in
         let routers = List.fold_left (fun acc x -> match x with
           | Routers ys -> String.concat ", " (List.map Ipaddr.V4.to_string ys)
           | _ -> acc) "none" reply.options in
         if reply.op <> Dhcp_wire.BOOTREPLY || not !logged_bootreply
-        then Log.info (fun f -> f "%s to %s yiddr %s siddr %s dns %s router %s domain %s"
+        then Log.info (fun f -> f "%s to %s yiddr %s siddr %s router %s domain %s"
           (op_to_string reply.op) (Macaddr.to_string (reply.dstmac))
           (Ipaddr.V4.to_string reply.yiaddr) (Ipaddr.V4.to_string reply.siaddr)
-          dns routers domain
+          routers domain
         );
         logged_bootreply := !logged_bootreply || (reply.op = Dhcp_wire.BOOTREPLY);
         Lwt.return database
