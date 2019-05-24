@@ -21,8 +21,7 @@
 
 [[constraint]]
   name = "github.com/linuxkit/virtsock"
-  source = "https://github.com/djs55/virtsock"
-  revision = "bcbccfd529e0a5cbc315b4b4ce1854f5fbc75dbb"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/docker/go-p9p"

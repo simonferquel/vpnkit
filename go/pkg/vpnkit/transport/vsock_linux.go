@@ -6,13 +6,10 @@ import (
 	"strconv"
 
 	"github.com/linuxkit/virtsock/pkg/vsock"
-	"github.com/pkg/errors"
 )
 
 func NewVsockTransport() Transport {
-	if hvsockSupported() {
-		return &hvs{}
-	}
+
 	return &vs{}
 }
 
@@ -33,4 +30,9 @@ func (_ *vs) Listen(path string) (net.Listener, error) {
 		return nil, err
 	}
 	return vsock.Listen(vsock.CIDAny, uint32(port))
+}
+
+func parsePort(path string) (int, error) {
+	v, err := strconv.ParseUint(path, 10, 32)
+	return int(v), err
 }
