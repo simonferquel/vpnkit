@@ -246,15 +246,15 @@
   version = "v0.2.9"
 
 [[projects]]
-  branch = "10586_fixes"
-  digest = "1:afcc93a5ffcbf5a73618d5f832fbf65a7d62f63763a1b31dccddf2390a7f11e4"
+  digest = "1:3ca80324aa532a797e1bae4835b06f84818f7d2e517d332f7ed3901ee3dc3279"
   name = "github.com/linuxkit/virtsock"
   packages = [
     "pkg/hvsock",
     "pkg/vsock",
   ]
   pruneopts = "NUT"
-  revision = "76c5cbe7912fc569ca7d3c02ddf9974ce670f7dd"
+  revision = "bcbccfd529e0a5cbc315b4b4ce1854f5fbc75dbb"
+  source = "https://github.com/djs55/virtsock"
 
 [[projects]]
   branch = "master"
@@ -636,6 +636,7 @@
     "github.com/pkg/errors",
     "github.com/sirupsen/logrus",
     "github.com/stretchr/testify/assert",
+    "golang.org/x/crypto/ssh/terminal",
     "k8s.io/api/core/v1",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/apimachinery/pkg/fields",

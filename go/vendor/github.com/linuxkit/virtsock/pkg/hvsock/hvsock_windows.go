@@ -1,7 +1,6 @@
 package hvsock
 
 import (
-	"errors"
 	"io"
 	"log"
 	"runtime"
@@ -125,7 +124,22 @@ func bind(s syscall.Handle, a HypervAddr) error {
 }
 
 func accept(s syscall.Handle, a *HypervAddr) (syscall.Handle, error) {
-	return 0, errors.New("accept(): Unimplemented")
+	var sa rawSockaddrHyperv
+	var n = int32(unsafe.Sizeof(sa))
+	fd, err := sys_accept(s, &sa, &n)
+	if err != nil {
+		return fd, err
+	}
+
+	// Extract a HypervAddr from sa
+	raddr := HypervAddr{}
+	for i := 0; i < len(raddr.VMID); i++ {
+		a.VMID[i] = sa.VMID[i]
+	}
+	for i := 0; i < len(raddr.ServiceID); i++ {
+		a.ServiceID[i] = sa.ServiceID[i]
+	}
+	return fd, err
 }
 
 //
